@@ -3,6 +3,8 @@ tmp
 __pycache__
 
 # user data
+BF_historical.py
+calculate*.py
 *.json
 *.log
 *.csv
