@@ -58,6 +58,7 @@ if __name__ == '__main__':
     start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
     try:
         get_trades()
-        print(f'{time.time() - start:.2f}sec')
+        end_time = time.time() - start
+        print(f'{int(end_time / 3600)}hour {int(end_time / 60)}min {end_time:.2f}sec')
     except KeyboardInterrupt:
         pass

@@ -2,6 +2,7 @@ import os
 import json
 import time
 import pybotters
+import numpy as np
 import pandas as pd
 from datetime import datetime
 
@@ -19,7 +20,9 @@ def get_historical():
         last_time = temp_data[-1][0] - params['grouping'] * 1000 * 2
     df = pd.DataFrame(data, dtype='object')[::-1]
     df = df.drop(columns={6, 7, 8, 9}).rename(
-        columns={0: 'time', 1: 'open', 2: 'high', 3: 'low', 4: 'close', 5: 'volume'}).set_index('time')
+        columns={0: 'time', 1: 'open', 2: 'high', 3: 'low', 4: 'close', 5: 'volume'}).set_index('time').replace(
+        {'open': {'': np.nan}, 'high': {'': np.nan}, 'low': {'': np.nan}, 'close': {'': np.nan},
+         'volume': {'': np.nan}}).dropna(how='any')
     df.index = pd.to_datetime(df.index, unit='ms', utc=True).tz_convert('Asia/Tokyo').tz_localize(None)
     df.to_csv(f'csv/bf_ohlcv_{symbol}_{period}.csv')
 
