@@ -23,8 +23,12 @@ def get_historical():
         columns={0: 'time', 1: 'open', 2: 'high', 3: 'low', 4: 'close', 5: 'volume'}).set_index('time').replace(
         {'open': {'': np.nan}, 'high': {'': np.nan}, 'low': {'': np.nan}, 'close': {'': np.nan},
          'volume': {'': np.nan}}).dropna(how='any')
-    df.index = pd.to_datetime(df.index, unit='ms', utc=True).tz_convert('Asia/Tokyo').tz_localize(None)
-    df.to_csv(f'csv/bf_ohlcv_{symbol}_{period}.csv')
+    df.index = pd.to_datetime(df.index, unit='ms', utc=True).tz_localize(None)
+    if os.path.isfile(path):
+        df = pd.concat([df_old, df])
+        df = df.drop_duplicates()
+    df.to_csv(path)
+    print(f'Output --> {path}')
 
 
 def now_bf():
@@ -43,15 +47,22 @@ if __name__ == '__main__':
         config = json.load(f)
     if not os.path.isdir("csv"):
         os.makedirs("csv")
-    grouping = config['grouping']  # 1 - 30
+    grouping = 1  # 1 - 30
     symbol = config['symbol']  # ETH_JPY, BTC_JPY etc...
     period = config['period']  # m, h, d
     now = now_bf()
     params = {'symbol': symbol, 'period': period, 'type': 'full', 'before': now, 'grouping': grouping}
-    start_time_str = config['date']  # 2021-08-30 21:00:00
-    start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').timestamp() * 1000
+    path = f'csv/bf_ohlcv_{symbol}_{period}.csv'
+    if os.path.isfile(path):
+        print(f"Found old data --> {path}\nDiff update...\n")
+        df_old = pd.read_csv(path, index_col='time', parse_dates=True)
+        start_date = int(df_old.index[-1].timestamp() * 1000)
+    else:
+        start_time_str = config['date']  # 2021-08-30 21:00:00
+        start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').timestamp() * 1000
+    print(f'Until  --> {datetime.fromtimestamp(start_date / 1000)}')
     try:
         get_historical()
-        print(f'{time.time() - start:.2f}sec')
+        print(f'elapsed time: {time.time() - start:.2f}sec')
     except KeyboardInterrupt:
         pass

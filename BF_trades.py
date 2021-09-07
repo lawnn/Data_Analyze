@@ -28,8 +28,7 @@ def get_trades():
     df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
     df = df.astype({'price': 'float', 'size': 'float'})
     if os.path.isfile(path):
-        old_df = pd.read_csv(path, index_col='exec_date', parse_dates=True)
-        df = pd.concat([old_df, df])
+        df = pd.concat([df_old, df])
         df = df.drop_duplicates()
     df.to_csv(path)
     print(f'Output --> {path}')
@@ -44,17 +43,17 @@ if __name__ == '__main__':
     symbol = config['symbol']  # FX_BTC_JPY, BTC_JPY, ETH_JPY etc...
     path = f'csv/bf_trades_{symbol}.csv'
     if os.path.isfile(path):
-        print(f"Found old data\nDiff update...\nMerge {path}")
+        print(f"Found old data --> {path}\nDiff update...\n\n")
         df_old = pd.read_csv(path, index_col='exec_date', parse_dates=True)
         start_date = df_old.index[-1]
     else:
         start_time_str = config['date']  # 例:2021-08-30 21:00:00
         start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
 
-    print(f'Get bitflyer trades from {symbol}\nUntil --> {start_date}')
+    print(f'Until  --> {start_date}')
     try:
         get_trades()
         end_time = time.time() - start
-        print(f'{end_time / 60:.2f}min')
+        print(f'elapsed time: {end_time / 60:.2f}min')
     except KeyboardInterrupt:
         pass
