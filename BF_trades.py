@@ -1,50 +1,38 @@
 import os
-import sys
 import time
 import json
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
-
-
-# 差分アップデート用関数.他から作るため後回し
-def check(market_name, resolution, start_time_str):
-    start_time_ux = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S').timestamp()
-    path = 'csv/{}-{}min.csv'.format(market_name, int(resolution / 60))
-    if os.path.isfile(path):
-        print("古いデータが見つかりました.\n差分アップデートします.")
-        df_old = pd.read_csv(path, index_col='time', parse_dates=True)
-        df_old.index = df_old.index - timedelta(hours=9)
-        start_time_ux = df_old.index[-1].timestamp() + 1
-
-    params = dict(resolution=resolution, limit=5000, start_time=int(start_time_ux), end_time=int(time.time()))
-    resolution_list = [15, 60, 300, 900, 3600, 14400, 86400]
-    if resolution not in resolution_list:
-        print("resolutionの値が異常です. {}の中から選んでください".format(resolution_list))
-        sys.exit()
-    print(f'Get historical data from {market_name}')
-    get_trades(market_name, params, path)
+from datetime import datetime
 
 
 def get_trades():
     r = requests.get('https://api.bitflyer.com/v1/getexecutions', params=dict(product_code=symbol, count=500))
     data = r.json()
     df = pd.DataFrame(data[::-1], dtype='float').set_index('exec_date')
-    last_date = pd.to_datetime(df.index, utc=True).tz_convert('Asia/Tokyo').tz_localize(None)[-1]
-    df.index = pd.to_datetime(df.index, utc=True).tz_convert('Asia/Tokyo').tz_localize(None)
+    last_date = pd.to_datetime(df.index, utc=True).tz_localize(None)[-1]
     ID = data[-1]['id']
+    count = 0
     while start_date <= last_date:
+        if count % 500 == 0:
+            print(last_date)
+        count += 1
         temp_r = requests.get('https://api.bitflyer.com/v1/getexecutions',
                               params=dict(product_code=symbol, count=500, before=ID))
         temp_data = temp_r.json()
         temp_df = pd.DataFrame(temp_data[::-1], dtype='float').set_index('exec_date')
-        last_date = pd.to_datetime(temp_df.index, utc=True).tz_convert('Asia/Tokyo').tz_localize(None)[-1]
+        last_date = pd.to_datetime(temp_df.index, utc=True).tz_localize(None)[-1]
         ID = int(temp_data[-1]['id'])
         df = pd.concat([temp_df, df])
         time.sleep(0.59)
-    df.index = pd.to_datetime(df.index, utc=True).tz_convert('Asia/Tokyo').tz_localize(None)
+    df.index = pd.to_datetime(df.index, utc=True).tz_localize(None)
     df = df.astype({'price': 'float', 'size': 'float'})
-    df.to_csv(f'csv/bf_{symbol}_{start_date:%Y%m%d}.csv')
+    if os.path.isfile(path):
+        old_df = pd.read_csv(path, index_col='exec_date', parse_dates=True)
+        df = pd.concat([old_df, df])
+        df = df.drop_duplicates()
+    df.to_csv(path)
+    print(f'Output --> {path}')
 
 
 if __name__ == '__main__':
@@ -54,11 +42,19 @@ if __name__ == '__main__':
     if not os.path.isdir("csv"):
         os.makedirs("csv")
     symbol = config['symbol']  # FX_BTC_JPY, BTC_JPY, ETH_JPY etc...
-    start_time_str = config['date']  # 例:2021-08-30 21:00:00
-    start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
+    path = f'csv/bf_trades_{symbol}.csv'
+    if os.path.isfile(path):
+        print(f"Found old data\nDiff update...\nMerge {path}")
+        df_old = pd.read_csv(path, index_col='exec_date', parse_dates=True)
+        start_date = df_old.index[-1]
+    else:
+        start_time_str = config['date']  # 例:2021-08-30 21:00:00
+        start_date = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M:%S')
+
+    print(f'Get bitflyer trades from {symbol}\nUntil --> {start_date}')
     try:
         get_trades()
         end_time = time.time() - start
-        print(f'{int(end_time / 3600)}hour {int(end_time / 60)}min {end_time:.2f}sec')
+        print(f'{end_time / 60:.2f}min')
     except KeyboardInterrupt:
         pass
