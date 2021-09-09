@@ -1,23 +1,40 @@
-from matplotlib import pyplot as plt
+import os
 import numpy as np
+from matplotlib import pyplot as plt
 
 
-def plot_corrcoef(arr1, arr2):
+def plot_corrcoef(arr1, arr2, output_dir: str = None, title: str = None, save_fig: bool = False):
+    """ plot_corrcoef(past_returns, future_returns, output_dir='my_favorite/1', title='comparison', save_fig=True)
+    :param arr1: ndarray
+    :param arr2: ndarray
+    :param output_dir: png/comparison
+    :param title: EXAMPLE
+    :param save_fig: True or False
+    :return:
+    """
+
+    if output_dir is None:
+        output_dir = f'./png/'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     correlation = np.corrcoef(arr1, arr2)
     r2 = correlation[0][1] ** 2
     # グラフ出力.
-    title = f"IC = {correlation[0][1]:.4f}"
+    if title is None:
+        title = f"IC = {correlation[0][1]:.4f}"
     fig = plt.figure()
     fig.suptitle(title)
     ax = fig.add_subplot(111)
     ax.scatter(arr1, arr2, c="blue", s=20, edgecolors="blue", alpha=0.3)
-    ax.set_xlabel(f"Indicator1")
-    ax.set_ylabel(f"Indicator2")
+    ax.set_xlabel(f"Return")
+    ax.set_ylabel(f"Indicator")
     ax.grid(which="major", axis="x", color="gray", alpha=0.5, linestyle="dotted", linewidth=1)
     ax.grid(which="major", axis="y", color="gray", alpha=0.5, linestyle="dotted", linewidth=1)
     ax.text(0.75, 0.1, f"R**2={r2:.4f}", transform=ax.transAxes)
-    ax.text(0.55, 0.04, f"ProportionCorrect={(correlation[0][1] + 1) / 2:.2f}%", transform=ax.transAxes)
-    plt.savefig('corrcoef.png')
+    ax.text(0.55, 0.04, f"ProportionCorrect={(correlation[0][1] + 1) / 2 * 100:.2f}%", transform=ax.transAxes)
+    if save_fig:
+        plt.savefig(f'{output_dir}/{title}_corrcoef.png')
     plt.show()
 
 
