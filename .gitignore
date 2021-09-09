@@ -3,14 +3,14 @@ tmp
 __pycache__
 
 # user data
-BF_historical.py
-calculate*.py
 *.json
 *.log
 *.csv
 *.log.*
 *.png
 *.html
+calc*
+example*
 src/datautility.py
 
 # default config
