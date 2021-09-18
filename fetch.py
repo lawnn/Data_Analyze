@@ -8,9 +8,10 @@ from datetime import datetime, timedelta
 
 
 def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm',
-                      grouping: int = 1) -> None:
+                      grouping: int = 1, output_dir: str = None) -> None:
     """ example
     bf_get_historical('2021/09/01')
+    :param output_dir: str
     :param st_date: 2021/09/01
     :param symbol: FX_BTC_JPY, BTC_JPY, ETH_JPY
     :param period: m
@@ -19,20 +20,24 @@ def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm
     """
     start = time.time()
 
-    if not os.path.isdir("csv"):
-        os.makedirs("csv")
+    if output_dir is None:
+        output_dir = f'csv/bf_ohlcv_{symbol}_'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
+    path = f'{output_dir}_{period}.csv'
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     now = int(datetime.strptime(now_str, "%Y-%m-%d %H:%M").timestamp()) * 1000
     params = {'symbol': symbol, 'period': period, 'type': 'full', 'before': now, 'grouping': grouping}
-    path = f'csv/bf_ohlcv_{symbol}_{period}.csv'
 
     if os.path.isfile(path):
         print(f"Found old data --> {path}\nDiff update...\n")
         df_old = pd.read_csv(path, index_col='time', parse_dates=True)
         start_date = int(df_old.index[-1].timestamp() * 1000)
     else:
+        st_date = st_date.replace('/', '-')
         start_date = datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S').timestamp() * 1000
+
     print(f'Until  --> {datetime.fromtimestamp(start_date / 1000)}')
 
     r = pybotters.get("https://lightchart.bitflyer.com/api/ohlc", params=params)
@@ -64,9 +69,10 @@ def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm
     print(f'elapsed time: {time.time() - start:.2f}sec')
 
 
-def bf_get_trades(st_date: str, symbol: str = 'FX_BTC_JPY') -> None:
+def bf_get_trades(st_date: str, symbol: str = 'FX_BTC_JPY', output_dir: str = None) -> None:
     """ example
     bf_get_trades('2021/09/01')
+    :param output_dir: str
     :param st_date: 2021/09/01
     :param symbol: FX_BTC_JPY, BTC_JPY, ETH_JPY
     :return:
@@ -74,17 +80,20 @@ def bf_get_trades(st_date: str, symbol: str = 'FX_BTC_JPY') -> None:
 
     start = time.time()
 
-    if not os.path.isdir("csv"):
-        os.makedirs("csv")
+    if output_dir is None:
+        output_dir = f'./bitflyer/{symbol}/trades/'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    path = f'csv/bf_trades_{symbol}.csv'
+    path = f'{output_dir}/{symbol}.csv'
 
     if os.path.isfile(path):
         print(f"Found old data --> {path}\nDiff update...\n\n")
         df_old = pd.read_csv(path, index_col='exec_date', parse_dates=True)
         start_date = df_old.index[-1]
     else:
-        start_date = datetime.strptime(st_date, '%Y/%m/%d %H:%M:%S')
+        st_date = st_date.replace('/', '-')
+        start_date = datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S')
 
     print(f'Until  --> {start_date}')
 
