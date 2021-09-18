@@ -210,8 +210,8 @@ def binance_get_OI(st_date: str, symbol: str = 'BTCUSDT', period: str = '5m', ou
 
     while last_time >= start_date:
         temp_r = requests.get("https://fapi.binance.com/futures/data/openInterestHist",
-                              params=dict(symbol='BTCUSDT',
-                                          period='5m',
+                              params=dict(symbol=symbol,
+                                          period=period,
                                           limit=500,
                                           startTime=start_date,
                                           endTime=last_time))
@@ -272,8 +272,8 @@ def binance_get_buy_sell_vol(st_date: str, symbol: str = 'BTCUSDT', period: str 
 
     while last_time >= start_date:
         temp_r = requests.get("https://fapi.binance.com/futures/data/takerlongshortRatio",
-                              params=dict(symbol='BTCUSDT',
-                                          period='5m',
+                              params=dict(symbol=symbol,
+                                          period=period,
                                           limit=500,
                                           startTime=start_date,
                                           endTime=last_time))
