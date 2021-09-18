@@ -21,7 +21,7 @@ def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm
     start = time.time()
 
     if output_dir is None:
-        output_dir = f'csv/bf_ohlcv_{symbol}_'
+        output_dir = f'csv/bf_ohlcv_{symbol}'
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -35,6 +35,7 @@ def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm
         df_old = pd.read_csv(path, index_col='time', parse_dates=True)
         start_date = int(df_old.index[-1].timestamp() * 1000)
     else:
+        df_old = None
         st_date = st_date.replace('/', '-')
         start_date = datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S').timestamp() * 1000
 
@@ -92,6 +93,7 @@ def bf_get_trades(st_date: str, symbol: str = 'FX_BTC_JPY', output_dir: str = No
         df_old = pd.read_csv(path, index_col='exec_date', parse_dates=True)
         start_date = df_old.index[-1]
     else:
+        df_old = None
         st_date = st_date.replace('/', '-')
         start_date = datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S')
 
@@ -173,3 +175,127 @@ def gmo_get_historical(start_ymd: str, end_ymd: str, symbol: str = 'BTC_JPY', in
         cur_dt += timedelta(days=1)
         if request_interval > 0:
             time.sleep(request_interval)
+
+
+def binance_get_OI(st_date: str, symbol: str = 'BTCUSDT', period: str = '5m', output_dir: str = None) -> None:
+    start = time.time()
+
+    if output_dir is None:
+        output_dir = f'csv/binance/OI/{symbol}'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    path = f'{output_dir}/{period}.csv'
+
+    if os.path.isfile(path):
+        print(f"Found old data --> {path}\nDiff update...\n")
+        df_old = pd.read_csv(path, index_col='timestamp', parse_dates=True)
+        start_date = int(df_old.index[-1].timestamp() * 1000)
+    else:
+        df_old = None
+        st_date = st_date.replace('/', '-')
+        start_date = int(datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S').timestamp() * 1000)
+
+    print(f'Until  --> {datetime.fromtimestamp(start_date / 1000)}')
+
+    r = requests.get("https://fapi.binance.com/futures/data/openInterestHist",
+                     params=dict(symbol=symbol,
+                                 period=period,
+                                 limit=500,
+                                 startTime=start_date,
+                                 endTime=int(time.time()) * 1000))
+    data = r.json()
+    last_time = data[0]['timestamp'] - 1
+    df = pd.DataFrame(data)
+
+    while last_time >= start_date:
+        temp_r = requests.get("https://fapi.binance.com/futures/data/openInterestHist",
+                              params=dict(symbol='BTCUSDT',
+                                          period='5m',
+                                          limit=500,
+                                          startTime=start_date,
+                                          endTime=last_time))
+        temp_data = temp_r.json()
+        try:
+            last_time = temp_data[0]['timestamp'] - 1
+        except IndexError:
+            if os.path.isfile(path):
+                print("finish...")
+            break
+        temp_df = pd.DataFrame(temp_data)
+        df = pd.concat([temp_df, df])
+        time.sleep(0.2)
+
+    df = df.set_index('timestamp')
+    df.index = pd.to_datetime(df.index, unit='ms', utc=True).tz_localize(None)
+
+    if os.path.isfile(path):
+        df = pd.concat([df_old, df])
+        df = df.drop_duplicates()
+
+    df.to_csv(path)
+
+    print(f'Output --> {path}')
+    print(f'elapsed time: {time.time() - start:.2f}sec')
+
+
+def binance_get_buy_sell_vol(st_date: str, symbol: str = 'BTCUSDT', period: str = '5m', output_dir: str = None) -> None:
+    start = time.time()
+
+    if output_dir is None:
+        output_dir = f'csv/binance/volume/{symbol}'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    path = f'{output_dir}/{period}.csv'
+
+    if os.path.isfile(path):
+        print(f"Found old data --> {path}\nDiff update...\n")
+        df_old = pd.read_csv(path, index_col='timestamp', parse_dates=True)
+        start_date = int(df_old.index[-1].timestamp() * 1000)
+    else:
+        df_old = None
+        st_date = st_date.replace('/', '-')
+        start_date = int(datetime.strptime(st_date, '%Y-%m-%d %H:%M:%S').timestamp() * 1000)
+
+    print(f'Until  --> {datetime.fromtimestamp(start_date / 1000)}')
+
+    r = requests.get("https://fapi.binance.com/futures/data/takerlongshortRatio",
+                     params=dict(symbol=symbol,
+                                 period=period,
+                                 limit=500,
+                                 startTime=start_date,
+                                 endTime=int(time.time()) * 1000))
+    data = r.json()
+    last_time = data[0]['timestamp'] - 1
+    df = pd.DataFrame(data)
+
+    while last_time >= start_date:
+        temp_r = requests.get("https://fapi.binance.com/futures/data/takerlongshortRatio",
+                              params=dict(symbol='BTCUSDT',
+                                          period='5m',
+                                          limit=500,
+                                          startTime=start_date,
+                                          endTime=last_time))
+        temp_data = temp_r.json()
+        try:
+            last_time = temp_data[0]['timestamp'] - 1
+        except IndexError:
+            if os.path.isfile(path):
+                print("finish...")
+
+        temp_df = pd.DataFrame(temp_data)
+        df = pd.concat([temp_df, df])
+        time.sleep(0.2)
+
+    df = df.set_index('timestamp')
+    df.index = pd.to_datetime(df.index, unit='ms', utc=True).tz_localize(None)
+
+    if os.path.isfile(path):
+        df = pd.concat([df_old, df])
+        df = df.drop_duplicates()
+
+    df.to_csv(path)
+
+    print(f'Output --> {path}')
+    print(f'elapsed time: {time.time() - start:.2f}sec')
