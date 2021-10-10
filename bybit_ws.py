@@ -1,46 +1,52 @@
+import os
 import asyncio
 import pybotters
 import pandas as pd
 from datetime import datetime
 
 
-async def main(symbol: str, interval: int = 1):
+async def main(symbol: str = 'BTCUSDT', interval: float = 1.0, output_dir=None):
     """
     DataFrameの中身
-    buySumSize   -> Askの合計出来高
-    sellSumSize　-> bidの合計出来高
-    maxBuyPrice  -> Ask一番出来高の多いprice
-    maxSellPrice -> bid一番出来高の多いprice
+    buySumSize   -> Askの厚み
+    sellSumSize　-> bidの厚み
+    maxBuyPrice  -> Askで一番厚みがある価格
+    maxSellPrice -> bidで一番厚みがある価格
+    :param output_dir: str
     :param symbol: str
-    :param interval: int
+    :param interval: float
     :return:
     """
-    async with pybotters.Client(base_url='https://api.bybit.com') as client:
+    async with pybotters.Client() as client:
         store = pybotters.BybitDataStore()
 
         await client.ws_connect('wss://stream.bybit.com/realtime_public',
-                                send_json={'op': 'subscribe', 'args': [
-                                    f'orderBookL2_25.{symbol}',
-                                    f'trade.{symbol}'
-                                ]},
-                                hdlr_json=store.onmessage,
-                                )
+                                send_json={'op': 'subscribe', 'args': [f'orderBookL2_25.{symbol}']},
+                                hdlr_json=store.onmessage,)
 
-        while not all([
-            len(store.orderbook),
-            len(store.trade)
-        ]):
-            await store.wait()
+        await store.wait()
+
+        if output_dir is None:
+            output_dir = f'./bybit/{symbol}/orderBook/'
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
         df = pd.DataFrame()
 
         timer = 0
         while True:
-            asyncio.create_task(store.wait())
-            sec = datetime.utcnow().second
+            obtask = asyncio.create_task(store.orderbook.wait())
+            dt_now = datetime.utcnow()
+            sec = dt_now.second
 
             if sec + 1 > timer or sec + 1 < timer:
                 timer = sec + 1
+
+                # 00:00:00でCSV保存. df初期化
+                if dt_now.strftime('%H%M%S') == '000000':
+                    df.to_csv(f'{output_dir}{datetime.utcnow().strftime("%Y%m%d")}.csv')
+                    df = pd.DataFrame()
+
                 if sec % interval == 0:
                     now = datetime.utcnow()
                     ob = pd.DataFrame(store.orderbook.find())
@@ -56,18 +62,15 @@ async def main(symbol: str, interval: int = 1):
                     df = pd.concat([df, temp_df])
                     print(df)
 
-            await store.wait()
+            await obtask
 
 
 if __name__ == '__main__':
     try:
-        asyncio.run(main('BTCUSDT', interval=5))
+        if os.name == 'nt':
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        asyncio.run(main(interval=1))
     except KeyboardInterrupt:
         pass
-
-'''
-TO DO LIST
-・日付更新したらcsv保存. DataFrame初期化
-・途中で止めた場合もcsv保存する
-・保存先がごちゃごちゃにならないように整理する
-'''
+    finally:
+        print("stop")
