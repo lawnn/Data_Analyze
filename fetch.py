@@ -7,6 +7,68 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+def ftx_get_historical(start_ymd: str, end_ymd: str = None, symbol: str = 'BTC-PERP', resolution: int = 60,
+                       output_dir: str = None, request_interval: float = 0.035, update: bool = True) -> None:
+
+    if output_dir is None:
+        output_dir = f'./csv/FTX/ohlcv/{resolution}s'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    path = f"{output_dir}/{symbol}.csv"
+
+    if os.path.isfile(path) and update:
+        print("古いデータが見つかりました.\n差分アップデートします.")
+        df_old = pd.read_csv(path, index_col='datetime', parse_dates=True)
+        df_old.index = df_old.index
+        start_dt = df_old.index[-1].timestamp() + 1
+    else:
+        start_ymd = start_ymd.replace('/', '-')
+        start_dt = datetime.strptime(start_ymd, '%Y-%m-%d %H:%M:%S') + timedelta(hours=9)
+        start_dt = int(start_dt.timestamp())
+
+    if end_ymd is None:
+        end_ymd = datetime.now()
+    else:
+        end_ymd = end_ymd.replace('/', '-')
+        end_ymd = datetime.strptime(end_ymd, '%Y-%m-%d %H:%M:%S') + timedelta(hours=9)
+    end_dt = int(end_ymd.timestamp())
+
+    if start_dt > end_dt:
+        raise ValueError(f'end_ymd{end_ymd} should be after start_ymd{start_ymd}.')
+
+    params = dict(resolution=resolution, limit=5000, start_time=start_dt, end_time=end_dt)
+
+    print(f'output dir: {output_dir}  save term: {start_ymd} -> {end_ymd:%Y-%m-%d %H:%M:%S}')
+
+    r = requests.get(f'https://ftx.com/api/markets/{symbol}/candles', params=params)
+    data = r.json()
+    df = pd.DataFrame(data['result'])
+    last_time = int(data['result'][0]['time'] / 1000) - 1
+    while last_time >= start_dt:
+        time.sleep(request_interval)
+        temp_r = requests.get(f'https://ftx.com/api/markets/{symbol}/candles', params=dict(
+            resolution=resolution, limit=5000, start_time=start_dt, end_time=last_time))
+        temp_data = temp_r.json()
+        try:
+            last_time = int(temp_data['result'][0]['time'] / 1000) - 1
+        except IndexError:
+            if os.path.isfile(path):
+                print("アップデート完了\nデータ加工中...")
+            else:
+                print("これ以上古いデータがないので終了します.\nデータ加工中...")
+            break
+        temp_df = pd.DataFrame(temp_data['result'])
+        df = pd.concat([temp_df, df])
+    df['time'] = df['time'] / 1000
+    df.rename(columns={'time': 'datetime'}, inplace=True)
+    df['datetime'] = pd.to_datetime(df['datetime'].astype(int), unit='s', utc=True, infer_datetime_format=True)
+    df = df.set_index('datetime').reindex(columns=['open', 'high', 'low', 'close', 'volume'])
+    df.index = df.index.tz_localize(None)
+    if os.path.isfile(path) and update:
+        df = pd.concat([df_old, df])
+    df.to_csv(path)
+
+
 def bf_get_historical(st_date: str, symbol: str = 'FX_BTC_JPY', period: str = 'm',
                       grouping: int = 1, output_dir: str = None) -> None:
     """ example
