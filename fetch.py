@@ -11,6 +11,7 @@ def trades_to_historical(df, period: str = '1S'):
     df_ohlcv = pd.concat([df["price"].resample(period).ohlc().ffill(),
                           df["size"].resample(period).sum(), ], axis=1)
     df_ohlcv.columns = ['open', 'high', 'low', 'close', 'volume']
+    return df_ohlcv
 
 
 def ftx_get_historical(start_ymd: str, end_ymd: str = None, symbol: str = 'BTC-PERP', resolution: int = 60,
