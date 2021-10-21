@@ -7,6 +7,12 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+def trades_to_historical(df, period: str = '1S'):
+    df_ohlcv = pd.concat([df["price"].resample(period).ohlc().ffill(),
+                          df["size"].resample(period).sum(), ], axis=1)
+    df_ohlcv.columns = ['open', 'high', 'low', 'close', 'volume']
+
+
 def ftx_get_historical(start_ymd: str, end_ymd: str = None, symbol: str = 'BTC-PERP', resolution: int = 60,
                        output_dir: str = None, request_interval: float = 0.035, update: bool = True) -> None:
     if output_dir is None:
