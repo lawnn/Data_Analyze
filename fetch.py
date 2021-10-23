@@ -7,6 +7,16 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
+def resample_ohlc(org_df, timeframe):
+    df = org_df.resample(f'{timeframe * 60}S').agg(
+        {'open': 'first', 'high': 'max', 'low': 'min', 'close': 'last', 'volume': 'sum'})
+    df['close'] = df['close'].fillna(method='ffill')
+    df['open'] = df['open'].fillna(df['close'])
+    df['high'] = df['high'].fillna(df['close'])
+    df['low'] = df['low'].fillna(df['close'])
+    return df
+
+
 def trades_to_historical(df, period: str = '1S'):
     df_ohlcv = pd.concat([df["price"].resample(period).ohlc().ffill(),
                           df["size"].resample(period).sum(), ], axis=1)
@@ -207,7 +217,6 @@ def bitfinex_get_trades(start_ymd: str, end_ymd: str = None, symbol: str = 'tBTC
     :param end_ymd:
     :param symbol:
     :param output_dir:
-    :param request_interval:
     :param update:
     :return:
     """
